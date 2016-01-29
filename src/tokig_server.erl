@@ -14,6 +14,8 @@
                 groups = [],
                 memberships = []}).
 
+%% API
+
 start_link(Users, Groups, Memberships) ->
     lists:foreach(
         fun (Membership) ->
@@ -44,6 +46,8 @@ add_user(Pid, User) ->
 remove_user(Pid, User) ->
     gen_server:cast(Pid, {remove_user, User}).
 
+%% pure functions
+
 is_membership_valid(Users, Groups, {User, Group}) ->
     lists:member(User, Users) andalso lists:member(Group, Groups).
 
@@ -64,6 +68,8 @@ do_remove_user_test() ->
     NewUsers = do_remove_user(old, [old, someone]),
     ?assertNot(lists:member(old, NewUsers)).
 -endif.
+
+%% gen_server callbacks
 
 init(Args) ->
     {ok, undefined}.
