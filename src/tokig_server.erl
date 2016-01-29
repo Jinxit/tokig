@@ -44,6 +44,27 @@ add_user(Pid, User) ->
 remove_user(Pid, User) ->
     gen_server:cast(Pid, {remove_user, User}).
 
+is_membership_valid(Users, Groups, {User, Group}) ->
+    lists:member(User, Users) andalso lists:member(Group, Groups).
+
+do_add_user(User, Users) ->
+    [User|Users].
+
+-ifdef(TEST).
+do_add_user_test() ->
+    NewUsers = do_add_user(new, [old, someone]),
+    ?assert(lists:member(new, NewUsers)).
+-endif.
+
+do_remove_user(User, Users) ->
+    lists:delete(User, Users).
+
+-ifdef(TEST).
+do_remove_user_test() ->
+    NewUsers = do_remove_user(old, [old, someone]),
+    ?assertNot(lists:member(old, NewUsers)).
+-endif.
+
 init(Args) ->
     {ok, undefined}.
 
@@ -65,24 +86,3 @@ terminate(_Reason, _State) ->
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
-
-is_membership_valid(Users, Groups, {User, Group}) ->
-    lists:member(User, Users) andalso lists:member(Group, Groups).
-
-do_add_user(User, Users) ->
-    [User|Users].
-
--ifdef(TEST).
-do_add_user_test() ->
-    NewUsers = do_add_user(new, [old, someone]),
-    ?assert(lists:member(new, NewUsers)).
--endif.
-
-do_remove_user(User, Users) ->
-    lists:delete(User, Users).
-
--ifdef(TEST).
-do_remove_user_test() ->
-    NewUsers = do_remove_user(old, [old, someone]),
-    ?assertNot(lists:member(old, NewUsers)).
--endif.
