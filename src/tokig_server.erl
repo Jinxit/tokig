@@ -7,7 +7,9 @@
          add_user/2,
          remove_user/2,
          add_group/2,
-         remove_group/2]).
+         remove_group/2,
+         add_membership/3,
+         remove_membership/3]).
 
 -behaviour(gen_server).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
@@ -87,6 +89,28 @@ remove_group_test_() ->
     ] end).
 -endif.
 
+add_membership(Pid, User, Group) ->
+    gen_server:call(Pid, {add_membership, User, Group}).
+
+-ifdef(TEST).
+add_membership_test_() ->
+    server_test([user], [group], [], fun (Pid) -> [
+        ?_assertMatch(ok, add_membership(Pid, user, group)),
+        ?_assertMatch(#state{memberships = [{user, group}]}, gen_server:call(Pid, get_state))
+    ] end).
+-endif.
+
+remove_membership(Pid, User, Group) ->
+    gen_server:call(Pid, {remove_membership, User, Group}).
+
+-ifdef(TEST).
+remove_membership_test_() ->
+    server_test([user], [group], [{user, group}], fun (Pid) -> [
+        ?_assertMatch(ok, remove_membership(Pid, user, group)),
+        ?_assertMatch(#state{memberships = []}, gen_server:call(Pid, get_state))
+    ] end).
+-endif.
+
 %% pure functions
 
 is_membership_valid(Users, Groups, {User, Group}) ->
@@ -128,6 +152,24 @@ do_remove_group_test() ->
     ?assertNot(lists:member(old, NewGroups)).
 -endif.
 
+do_add_membership(User, Group, Memberships) ->
+    [{User, Group}|Memberships].
+
+-ifdef(TEST).
+do_add_membership_test() ->
+    NewMemberships = do_add_membership(user, group, []),
+    ?assert(lists:member({user, group}, NewMemberships)).
+-endif.
+
+do_remove_membership(User, Group, Memberships) ->
+    lists:delete({User, Group}, Memberships).
+
+-ifdef(TEST).
+do_remove_membership_test() ->
+    NewMemberships = do_remove_membership(user, group, [{user, group}]),
+    ?assertNot(lists:member({user, group}, NewMemberships)).
+-endif.
+
 %% gen_server callbacks
 
 init([Users, Groups, Memberships]) ->
@@ -141,6 +183,10 @@ handle_call({add_group, Group}, _From, #state{groups = Groups} = State) ->
     {reply, ok, State#state{groups = do_add_group(Group, Groups)}};
 handle_call({remove_group, Group}, _From, #state{groups = Groups} = State) ->
     {reply, ok, State#state{groups = do_remove_group(Group, Groups)}};
+handle_call({add_membership, User, Group}, _From, #state{memberships = Memberships} = State) ->
+    {reply, ok, State#state{memberships = do_add_membership(User, Group, Memberships)}};
+handle_call({remove_membership, User, Group}, _From, #state{memberships = Memberships} = State) ->
+    {reply, ok, State#state{memberships = do_remove_membership(User, Group, Memberships)}};
 handle_call(get_state, _From, State) ->
     {reply, State, State};
 handle_call(_Request, _From, State) ->
