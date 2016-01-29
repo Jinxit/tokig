@@ -46,6 +46,12 @@ add_user(Pid, User) ->
 remove_user(Pid, User) ->
     gen_server:cast(Pid, {remove_user, User}).
 
+add_group(Pid, Group) ->
+    gen_server:cast(Pid, {add_group, Group}).
+
+remove_group(Pid, Group) ->
+    gen_server:cast(Pid, {remove_group, Group}).
+
 %% pure functions
 
 is_membership_valid(Users, Groups, {User, Group}) ->
@@ -69,6 +75,24 @@ do_remove_user_test() ->
     ?assertNot(lists:member(old, NewUsers)).
 -endif.
 
+do_add_group(Group, Groups) ->
+    [Group|Groups].
+
+-ifdef(TEST).
+do_add_group_test() ->
+    NewGroups = do_add_group(new, [old, some_group]),
+    ?assert(lists:member(new, NewGroups)).
+-endif.
+
+do_remove_group(Group, Groups) ->
+    lists:delete(Group, Groups).
+
+-ifdef(TEST).
+do_remove_group_test() ->
+    NewGroups = do_remove_group(old, [old, some_group]),
+    ?assertNot(lists:member(old, NewGroups)).
+-endif.
+
 %% gen_server callbacks
 
 init(Args) ->
@@ -81,6 +105,10 @@ handle_cast({add_user, User}, #state{users = Users} = State) ->
     {noreply, State#state{users = do_add_user(User, Users)}};
 handle_cast({remove_user, User}, #state{users = Users} = State) ->
     {noreply, State#state{users = do_remove_user(User, Users)}};
+handle_cast({add_group, Group}, #state{groups = Groups} = State) ->
+    {noreply, State#state{groups = do_add_group(Group, Groups)}};
+handle_cast({remove_group, Group}, #state{groups = Groups} = State) ->
+    {noreply, State#state{groups = do_remove_group(Group, Groups)}};
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
