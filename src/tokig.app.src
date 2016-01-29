@@ -1,0 +1,12 @@
+{application, tokig,
+ [
+  {description, ""},
+  {vsn, "1"},
+  {registered, []},
+  {applications, [
+                  kernel,
+                  stdlib
+                 ]},
+  {mod, { tokig_app, []}},
+  {env, []}
+ ]}.
