@@ -26,7 +26,7 @@ start_link(Users, Groups, Memberships) ->
                 true  -> ok
             end
         end, Memberships),
-    gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
+    gen_server:start_link({local, ?MODULE}, ?MODULE, [Users, Groups, Memberships], []).
 
 -ifdef(TEST).
 start_link_error_on_inexistent_user_test() ->
@@ -37,22 +37,55 @@ start_link_error_on_inexistent_group_test() ->
     ?assertError(invalid_membership, start_link([], [user], [{user, group}])),
     ?assertError(invalid_membership, start_link([other_group], [user], [{user, group}])).
 
-start_link_works_if_memberships_are_valid_test() ->
-    {ok, Pid} = start_link([user], [group], [{user, group}]),
-    ?assertNot(undefined == whereis(?MODULE)).
+start_link_works_if_memberships_are_valid_test_() ->
+    server_test([user], [group], [{user, group}], fun (Pid) -> [
+        ?_assert(Pid == whereis(?MODULE))
+    ] end).
 -endif.
 
 add_user(Pid, User) ->
-    gen_server:cast(Pid, {add_user, User}).
+    gen_server:call(Pid, {add_user, User}).
+
+-ifdef(TEST).
+add_user_test_() ->
+    server_test([], [], [], fun (Pid) -> [
+        ?_assertMatch(ok, add_user(Pid, user)),
+        ?_assertMatch(#state{users = [user]}, gen_server:call(Pid, get_state))
+    ] end).
+-endif.
 
 remove_user(Pid, User) ->
-    gen_server:cast(Pid, {remove_user, User}).
+    gen_server:call(Pid, {remove_user, User}).
+
+-ifdef(TEST).
+remove_user_test_() ->
+    server_test([user], [], [], fun (Pid) -> [
+        ?_assertMatch(ok, remove_user(Pid, user)),
+        ?_assertMatch(#state{users = []}, gen_server:call(Pid, get_state))
+    ] end).
+-endif.
 
 add_group(Pid, Group) ->
-    gen_server:cast(Pid, {add_group, Group}).
+    gen_server:call(Pid, {add_group, Group}).
+
+-ifdef(TEST).
+add_group_test_() ->
+    server_test([], [], [], fun (Pid) -> [
+        ?_assertMatch(ok, add_group(Pid, group)),
+        ?_assertMatch(#state{groups = [group]}, gen_server:call(Pid, get_state))
+    ] end).
+-endif.
 
 remove_group(Pid, Group) ->
-    gen_server:cast(Pid, {remove_group, Group}).
+    gen_server:call(Pid, {remove_group, Group}).
+
+-ifdef(TEST).
+remove_group_test_() ->
+    server_test([], [group], [], fun (Pid) -> [
+        ?_assertMatch(ok, remove_group(Pid, group)),
+        ?_assertMatch(#state{groups = []}, gen_server:call(Pid, get_state))
+    ] end).
+-endif.
 
 %% pure functions
 
@@ -97,20 +130,22 @@ do_remove_group_test() ->
 
 %% gen_server callbacks
 
-init(Args) ->
-    {ok, undefined}.
+init([Users, Groups, Memberships]) ->
+    {ok, #state{users = Users, groups = Groups, memberships = Memberships}}.
 
+handle_call({add_user, User}, _From, #state{users = Users} = State) ->
+    {reply, ok, State#state{users = do_add_user(User, Users)}};
+handle_call({remove_user, User}, _From, #state{users = Users} = State) ->
+    {reply, ok, State#state{users = do_remove_user(User, Users)}};
+handle_call({add_group, Group}, _From, #state{groups = Groups} = State) ->
+    {reply, ok, State#state{groups = do_add_group(Group, Groups)}};
+handle_call({remove_group, Group}, _From, #state{groups = Groups} = State) ->
+    {reply, ok, State#state{groups = do_remove_group(Group, Groups)}};
+handle_call(get_state, _From, State) ->
+    {reply, State, State};
 handle_call(_Request, _From, State) ->
     {reply, {error, unknown_call}, State}.
 
-handle_cast({add_user, User}, #state{users = Users} = State) ->
-    {noreply, State#state{users = do_add_user(User, Users)}};
-handle_cast({remove_user, User}, #state{users = Users} = State) ->
-    {noreply, State#state{users = do_remove_user(User, Users)}};
-handle_cast({add_group, Group}, #state{groups = Groups} = State) ->
-    {noreply, State#state{groups = do_add_group(Group, Groups)}};
-handle_cast({remove_group, Group}, #state{groups = Groups} = State) ->
-    {noreply, State#state{groups = do_remove_group(Group, Groups)}};
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
@@ -122,3 +157,14 @@ terminate(_Reason, _State) ->
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
+
+% test helpers
+
+-ifdef(TEST).
+server_test(Users, Groups, Memberships, Test) ->
+    {setup,
+        fun () -> {ok, Pid} = start_link(Users, Groups, Memberships), Pid end,
+        fun (Pid) -> gen_server:stop(Pid) end,
+        Test
+    }.
+-endif.
